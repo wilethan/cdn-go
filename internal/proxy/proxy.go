@@ -37,10 +37,38 @@ func NewProxy(backend string, cacheSize int) (*Proxy, error) {
 	}, nil
 }
 
+// isBlockedRequest vérifie si la requête doit être bloquée
+func isBlockedRequest(r *http.Request) bool {
+	blockedExtensions := []string{".exe", ".bat", ".sh", ".cmd"}
+	blockedMethods := map[string]bool{"DELETE": true, "PATCH": true}
+
+	// Bloquer certaines méthodes HTTP
+	if blockedMethods[r.Method] {
+		log.Printf("[BLOCKED] Méthode HTTP interdite : %s", r.Method)
+		return true
+	}
+
+	// Bloquer certaines extensions de fichiers
+	for _, ext := range blockedExtensions {
+		if len(r.URL.Path) > len(ext) && r.URL.Path[len(r.URL.Path)-len(ext):] == ext {
+			log.Printf("[BLOCKED] Extension interdite : %s", r.URL.Path)
+			return true
+		}
+	}
+
+	return false
+}
+
 // ServeHTTP gère les requêtes HTTP entrantes
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Construction de l'URL de destination
 	targetURL := p.backendURL.ResolveReference(r.URL)
+
+	// Vérifier si la requête doit être bloquée
+	if isBlockedRequest(r) {
+		http.Error(w, "Requête interdite", http.StatusForbidden)
+		return
+	}
 
 	// Vérifier si la réponse est en cache
 	if cachedResponse, found := p.cache.Get(targetURL.String()); found {
