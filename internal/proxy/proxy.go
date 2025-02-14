@@ -17,6 +17,7 @@ import (
 type Proxy struct {
 	backendURL *url.URL
 	cache      *lru.Cache
+	reverseProxy *httputil.ReverseProxy
 }
 
 // NewProxy crée une nouvelle instance de proxy avec cache
@@ -31,11 +32,16 @@ func NewProxy(backend string, cacheSize int) (*Proxy, error) {
 		return nil, fmt.Errorf("Erreur lors de la création du cache: %w", err)
 	}
 
+	// Créer un reverse proxy
+	proxy := httputil.NewSingleHostReverseProxy(parsedURL)
+
 	return &Proxy{
-		backendURL: parsedURL,
-		cache:      cache,
+		backendURL:   parsedURL,
+		cache:        cache,
+		reverseProxy: proxy,
 	}, nil
 }
+
 
 // isBlockedRequest vérifie si la requête doit être bloquée
 func isBlockedRequest(r *http.Request) bool {
